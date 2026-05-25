@@ -1,0 +1,69 @@
+from sys import platform
+
+import numpy as np
+import onnxruntime as rt
+from einops import rearrange
+
+if platform in {"win32", "win64"}:
+    try:
+        import onnxruntime.tools.add_openvino_win_libs as utils
+
+        utils.add_openvino_libs_to_path()
+    except ImportError:
+        pass
+
+
+class Predictor:
+    def __init__(self, model_config):
+        self.config = model_config
+        self.provider = self.config["provider"]
+        self.threshold = self.config["threshold"]
+        self.labels = {}
+
+        self.model_init(self.config["path_to_model"])
+        self.create_labels()
+
+    def create_labels(self):
+        with open(self.config["path_to_class_list"], "r", encoding="utf-8") as f:
+            labels = [line.strip() for line in f]
+            labels = self.decode_preds(labels)
+
+            idx_lbl_pairs = [x.split("\t") for x in labels]
+            self.labels = {int(x[0]): x[1] for x in idx_lbl_pairs}
+
+    def softmax(self, x):
+        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exp_x / np.sum(exp_x, axis=1, keepdims=True)
+
+    def predict(self, x):
+        clip = np.array(x).astype(np.float32) / 255.0
+        clip = rearrange(clip, "t h w c -> 1 c t h w")
+
+        prediction = self.model([self.output_name], {self.input_name: clip})[0]
+        prediction = self.softmax(prediction)
+        prediction = np.squeeze(prediction)
+        topk_labels = prediction.argsort()[-self.config["topk"] :][::-1]
+        topk_confidence = prediction[topk_labels]
+
+        result = [self.labels[lbl_idx] for lbl_idx in topk_labels]
+        if np.max(topk_confidence) < self.threshold:
+            return None
+
+        return {
+            "labels": dict(zip(range(len(result)), result)),
+            "confidence": dict(zip(range(len(result)), topk_confidence)),
+        }
+
+    def model_init(self, path_to_model: str) -> None:
+        session = rt.InferenceSession(path_to_model, providers=[self.provider])
+        self.input_name = session.get_inputs()[0].name
+        self.output_name = session.get_outputs()[0].name
+        self.model = session.run
+
+    def decode_preds(self, data):
+        if platform in {"win32", "win64"}:
+            try:
+                data = [i.encode("cp1251").decode("utf-8") for i in data]
+            except UnicodeError:
+                pass
+        return data
