@@ -14,6 +14,7 @@ import cv2
 from PIL import Image
 
 from utils import DEFAULT_CONFIG, SLInference
+from services.tutorial_dialog import open_tutorial
 from services.tts import SpeechEngine
 from services.phrase_recording import build_phrase, scan_frames
 
@@ -104,12 +105,23 @@ class GestureProApp(ctk.CTk):
             height=28,
         )
 
+        ctk.CTkButton(
+            header,
+            text="Туториал",
+            font=("Segoe UI", 12),
+            fg_color="#334155",
+            hover_color="#475569",
+            corner_radius=8,
+            height=32,
+            command=lambda: open_tutorial(self, edition="pro"),
+        ).pack(side="right", padx=(8, 20), pady=20)
+
         ctk.CTkLabel(
             header,
             text="R — запись · ESC — выход",
             font=FONT_SMALL,
             text_color="#64748B",
-        ).pack(side="right", padx=20)
+        ).pack(side="right", padx=(0, 8))
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=(12, 20))

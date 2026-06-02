@@ -10,6 +10,8 @@ import customtkinter as ctk
 import cv2
 from PIL import Image
 
+from services.tutorial_dialog import open_tutorial
+from services.upgrade_dialog import UpgradeProDialog
 from utils import DEFAULT_CONFIG, SLInference
 
 IGNORE = {"", "no"}
@@ -78,12 +80,35 @@ class GestureDemoApp(ctk.CTk):
             text_color="#E2E8F0",
         ).pack(side="left", pady=20)
 
+        ctk.CTkButton(
+            header,
+            text="Перейти на PRO",
+            font=("Segoe UI", 12, "bold"),
+            fg_color="#F59E0B",
+            hover_color="#D97706",
+            text_color="#0B0F1A",
+            corner_radius=8,
+            height=32,
+            command=self._open_upgrade,
+        ).pack(side="right", padx=(8, 12), pady=20)
+
+        ctk.CTkButton(
+            header,
+            text="Туториал",
+            font=("Segoe UI", 12),
+            fg_color="#334155",
+            hover_color="#475569",
+            corner_radius=8,
+            height=32,
+            command=lambda: open_tutorial(self, edition="demo"),
+        ).pack(side="right", padx=(0, 8), pady=20)
+
         ctk.CTkLabel(
             header,
             text="ESC — выход",
             font=FONT_SMALL,
             text_color="#64748B",
-        ).pack(side="right", padx=20)
+        ).pack(side="right", padx=(0, 8))
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=(12, 20))
@@ -168,6 +193,20 @@ class GestureDemoApp(ctk.CTk):
         ).pack(side="bottom", anchor="w", padx=20, pady=16)
 
         self.bind("<Escape>", lambda _e: self._on_close())
+
+    def _open_upgrade(self) -> None:
+        UpgradeProDialog(self, on_activated=self._switch_to_pro)
+
+    def _switch_to_pro(self) -> None:
+        self._running = False
+        self.inference.stop()
+        self.cap.release()
+        self.withdraw()
+        self.destroy()
+        from pro import GestureProApp
+
+        app = GestureProApp()
+        app.mainloop()
 
     def _tick(self) -> None:
         if not self._running:
